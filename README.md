@@ -25,4 +25,11 @@ After it you can compile project using maven from ClientExample directory (`mvn 
 
 If will connect to server and ask for market data incremental updates. All received market data messages will be stored to text file (there is example at ClientExample/market_data_gbp_usd.txt). All FIX messages will be stored to ClientExample/logs folder.
 
+Also it's possible to run small python FIX cracker script to build aggregated Order Book on collected market data updates.
+From folder FixMessageParser run following command: `python FIXCracker.py <path_to_your_collected_data_txt>` :
+For example `python FIXCracker.py data/market_data_gbp_usd.txt` it will show aggregated order book for every market update.
+
+Example:
+[[https://github.com/dmarienko/smarttradefix/tree/master/FixMessagesParser/images/running_app.png|alt=AggregatedBook]]
+
 
