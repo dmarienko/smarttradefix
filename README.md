@@ -30,6 +30,6 @@ From folder FixMessageParser run following command: `python FIXCracker.py <path_
 For example `python FIXCracker.py data/market_data_gbp_usd.txt` it will show aggregated order book for every market update.
 
 Example:
-[[https://github.com/dmarienko/smarttradefix/tree/master/FixMessagesParser/images/running_app.png|alt=AggregatedBook]]
+[[https://github.com/dmarienko/smarttradefix/blob/master/FixMessagesParser/images/running_app.png|alt=AggregatedBook]]
 
 
