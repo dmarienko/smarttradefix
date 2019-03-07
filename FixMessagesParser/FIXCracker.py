@@ -1,6 +1,7 @@
 import json
 import logging
-import os, sys
+import os
+import sys
 import time
 import xml.etree.cElementTree as etree
 from collections import OrderedDict, namedtuple
@@ -11,7 +12,18 @@ from sortedcontainers import SortedDict
 logger = logging.getLogger('FIX-PARSER')
 
 
-class help_struct:
+def cls():
+    """"
+    Clear console
+    """
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+
+class struct:
+    """
+    Helping class repeating matlab's dynamic structure behaviour in python
+    """
+
     def __init__(self, **kwargs):
         _odw = OrderedDict(**kwargs)
         self.__initialize(_odw.keys(), _odw.values())
@@ -39,6 +51,10 @@ class help_struct:
 
 
 class FixParser:
+    """
+    FIX protocol parser class
+    It takes reference to FIX xml dictionary in constructor to fetch all FIX tags
+    """
 
     def __init__(self, dictionary):
         self._dictionary = dictionary
@@ -53,6 +69,9 @@ class FixParser:
         return self._dictionary
 
     def _parse_dictionary(self):
+        """
+        Parse xml FIX dictionary file
+        """
         doc = etree.parse(self.dictionary)
         root = doc.getroot()
         fi = root.find('fields')
@@ -67,8 +86,13 @@ class FixParser:
 
         return tags
 
-    def convertToDict(self, message):
-        messageDict = OrderedDict()
+    def convert_to_dict(self, message):
+        """
+        Converts FIX message to dictionary presentation
+        :param message:
+        :return:
+        """
+        message_dict = OrderedDict()
         for k, v in message:
             # convert message-type
             name, value = k, v
@@ -79,11 +103,15 @@ class FixParser:
             except KeyError:
                 logger.warning("unknown-tag: {0}={1}".format(k, v))
             finally:
-                messageDict[name] = value
+                message_dict[name] = value
 
-        return messageDict
+        return message_dict
 
     def print_decoded(self, message):
+        """
+        Print decoded FIX message 
+        :param message: 
+        """
         for k, v in message:
             name, value = k, v
             try:
@@ -99,6 +127,11 @@ class FixParser:
                 logger.warning("unknown-tag: {0}={1}".format(k, v))
 
     def html_decoded(self, message):
+        """
+        Returns decoded FIX message as HTML table
+        :param message: FIX message
+        :return: HTML table
+        """
         r = '<table>'
         for k, v in message:
             # convert message-type
@@ -117,7 +150,7 @@ class FixParser:
         return r + '</table>'
 
     def convert(self, message):
-        converted = self.convertToDict(message)
+        converted = self.convert_to_dict(message)
         encoded = json.dumps(converted, sort_keys=True, indent=4, separators=(',', ': '))
         return encoded + '\n'
 
@@ -151,7 +184,8 @@ class FixParser:
         _as_html_str = lambda clmns: '<tr>%s</tr>' % ''.join(['<td><font size="1">%s</font></td>' % c for c in clmns])
 
         r += '<tr>%s</tr>' % ''.join(
-            ['<th>%s</th>' % s for s in ['EntryID', 'RefID', 'ENtryType', 'Action', 'Px', 'Size', 'EntryNo']])
+            ['<th>%s</th>' % s for s in ['EntryID', 'RefID', 'ENtryType', 'Action', 'Px', 'Size', 'EntryNo']]
+        )
 
         for k, v in message:
             name, value = k, v
@@ -195,11 +229,12 @@ class FixParser:
         return r + '</table>'
 
 
-def cls():
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-
 def print_book(asks, bids):
+    """
+    Print aggregated order book to console
+    :param asks: asks levels
+    :param bids: bids levels
+    """
     cls()
     print(' ========= Aggregated OrderBook ========= \n')
     for k, v in asks.items():
@@ -214,11 +249,14 @@ def find_key_by_refid(side, refid):
 
 
 def new_entry(side, refid, px, sz):
+    """
+    Creates new entry in order book side
+    """
     if side is not None:
         # key - price, values - struct where ids - dict of id:size, size = sum all sizes
-        levels = side.get(px, help_struct(ids=dict(), size=0))
+        levels = side.get(px, struct(ids=dict(), size=0))
         levels.size += sz
-        rec = levels.ids.get(refid, help_struct())
+        rec = levels.ids.get(refid, struct())
         rec.size = sz
         levels.ids.update({refid: rec})
         side.update({px: levels})
@@ -226,6 +264,9 @@ def new_entry(side, refid, px, sz):
 
 
 def del_entry(side, refid):
+    """
+    Delete entry in order book side by it's reference ID
+    """
     if side is not None:
         key = find_key_by_refid(side, refid)
         rec = side[key]
@@ -237,6 +278,11 @@ def del_entry(side, refid):
 
 
 def change_entry(side, refid, px, sz):
+    """
+    Change entry in order book side by it's reference ID
+    px - price
+    sz - size
+    """
     if side is not None:
         key = find_key_by_refid(side, refid)
         rec = side[key]
@@ -250,7 +296,10 @@ def change_entry(side, refid, px, sz):
 
 
 def snapshot_update(parser, message, asks, bids):
-    if 'MARKET_DATA_SNAPSHOT_FULL_REFRESH' != parser.convertToDict(message)['MsgType']:
+    """
+    Update order book by initial snapshot (full book)
+    """
+    if 'MARKET_DATA_SNAPSHOT_FULL_REFRESH' != parser.convert_to_dict(message)['MsgType']:
         raise ValueError("Wrong message type")
 
     ref_id, entry, px, sz = [None] * 4
@@ -276,7 +325,7 @@ def snapshot_update(parser, message, asks, bids):
     new_entry(subj, ref_id, px, sz)
 
 
-def do_action(side, action, refid, px, sz):
+def _do_action(side, action, refid, px, sz):
     if action == 'NEW':
         new_entry(side, refid, px, sz)
     elif action == 'DELETE':
@@ -288,7 +337,14 @@ def do_action(side, action, refid, px, sz):
 
 
 def incremental_update(parser, message, asks, bids):
-    if 'MARKET_DATA_INCREMENTAL_REFRESH' != parser.convertToDict(message)['MsgType']:
+    """
+    Update order book by following incremental update
+    :param parser: fix parser instance
+    :param message: incremental message update
+    :param asks: asks levels
+    :param bids: bids levels
+    """
+    if 'MARKET_DATA_INCREMENTAL_REFRESH' != parser.convert_to_dict(message)['MsgType']:
         raise ValueError("Wrong message type")
 
     action, ref_id, entry, px, sz = [None] * 5
@@ -300,7 +356,7 @@ def incremental_update(parser, message, asks, bids):
         if name == 'MDUpdateAction':
             # record new entry
             subj = bids if entry == 'BID' else (asks if entry == 'OFFER' else None)
-            do_action(subj, action, ref_id, px, sz)
+            _do_action(subj, action, ref_id, px, sz)
 
             action = value
             px, sz = None, None
@@ -313,21 +369,36 @@ def incremental_update(parser, message, asks, bids):
 
     # we need to add last entry
     subj = bids if entry == 'BID' else (asks if entry == 'OFFER' else None)
-    do_action(subj, action, ref_id, px, sz)
+    _do_action(subj, action, ref_id, px, sz)
 
 
 if __name__ == '__main__':
+    # create parser's instance using modified FIX4.4 dictionary for SmartTrade
     parser = FixParser('./FIX44.smart.trade.xml')
+
+    # parse messages from file
     messages = parser.parse_message_log(sys.argv[1], '|')
 
+    # print initial snapshot as decoded table
+    parser.print_decoded(messages[0])
+    time.sleep(1)
+
+    # print first incremental snapshot as decoded table
+    parser.print_decoded(messages[1])
+    time.sleep(1)
+
+    # here we will keep our OB (as sorted dictionaries for Asks and Bids levels)
     asks, bids = SortedDict(neg), SortedDict()
 
-    # load snapshot
+    # update OB by first initial snapshot
     snapshot_update(parser, messages[0], asks, bids)
+
+    # print 'first' OB
     print_book(asks, bids)
 
+    # now process every incremental update, update OB and print it to console
     for i, m in enumerate(messages[1:]):
         incremental_update(parser, m, asks, bids)
         print_book(asks, bids)
-        print('\n UPDATE: %d \n' % i)
+        print('\n\tUpdate: %d \n' % i)
         time.sleep(1)
